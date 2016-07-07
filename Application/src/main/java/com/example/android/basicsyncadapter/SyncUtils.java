@@ -24,6 +24,7 @@ import android.content.Context;
 import android.os.Build;
 import android.os.Bundle;
 import android.preference.PreferenceManager;
+import android.provider.CalendarContract;
 
 import com.example.android.common.accounts.GenericAccountService;
 import com.example.android.basicsyncadapter.provider.FeedContract;
@@ -91,9 +92,18 @@ public class SyncUtils {
         // Disable sync backoff and ignore sync preferences. In other words...perform sync NOW!
         b.putBoolean(ContentResolver.SYNC_EXTRAS_MANUAL, true);
         b.putBoolean(ContentResolver.SYNC_EXTRAS_EXPEDITED, true);
+//        ContentResolver.requestSync(
+//                GenericAccountService.GetAccount(ACCOUNT_TYPE), // Sync account
+//                FeedContract.CONTENT_AUTHORITY,                 // Content authority
+//                b);                                             // Extras
+
+
+
         ContentResolver.requestSync(
                 GenericAccountService.GetAccount(ACCOUNT_TYPE), // Sync account
-                FeedContract.CONTENT_AUTHORITY,                 // Content authority
+                CalendarContract.AUTHORITY,
                 b);                                             // Extras
+
+
     }
 }

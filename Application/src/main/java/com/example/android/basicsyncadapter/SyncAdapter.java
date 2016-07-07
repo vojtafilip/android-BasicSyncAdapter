@@ -22,6 +22,7 @@ import android.content.AbstractThreadedSyncAdapter;
 import android.content.ContentProviderClient;
 import android.content.ContentProviderOperation;
 import android.content.ContentResolver;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.OperationApplicationException;
 import android.content.SyncResult;
@@ -30,10 +31,13 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.RemoteException;
+import android.provider.CalendarContract;
+import android.provider.CalendarContract.*;
 import android.util.Log;
 
 import com.example.android.basicsyncadapter.net.FeedParser;
 import com.example.android.basicsyncadapter.provider.FeedContract;
+import com.example.android.common.accounts.GenericAccountService;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -44,6 +48,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.text.ParseException;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 
@@ -135,48 +140,153 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
     public void onPerformSync(Account account, Bundle extras, String authority,
                               ContentProviderClient provider, SyncResult syncResult) {
         Log.i(TAG, "Beginning network synchronization");
-        try {
-            final URL location = new URL(FEED_URL);
-            InputStream stream = null;
 
-            try {
-                Log.i(TAG, "Streaming data from network: " + location);
-                stream = downloadUrl(location);
-                updateLocalFeedData(stream, syncResult);
-                // Makes sure that the InputStream is closed after the app is
-                // finished using it.
-            } finally {
-                if (stream != null) {
-                    stream.close();
-                }
-            }
-        } catch (MalformedURLException e) {
-            Log.e(TAG, "Feed URL is malformed", e);
-            syncResult.stats.numParseExceptions++;
-            return;
-        } catch (IOException e) {
-            Log.e(TAG, "Error reading from network: " + e.toString());
-            syncResult.stats.numIoExceptions++;
-            return;
-        } catch (XmlPullParserException e) {
-            Log.e(TAG, "Error parsing feed: " + e.toString());
-            syncResult.stats.numParseExceptions++;
-            return;
-        } catch (ParseException e) {
-            Log.e(TAG, "Error parsing feed: " + e.toString());
-            syncResult.stats.numParseExceptions++;
-            return;
-        } catch (RemoteException e) {
-            Log.e(TAG, "Error updating database: " + e.toString());
-            syncResult.databaseError = true;
-            return;
-        } catch (OperationApplicationException e) {
-            Log.e(TAG, "Error updating database: " + e.toString());
-            syncResult.databaseError = true;
-            return;
-        }
-        Log.i(TAG, "Network synchronization complete");
+
+        syncCalendar(provider);
+
+
+
+
+
+//        try {
+//            final URL location = new URL(FEED_URL);
+//            InputStream stream = null;
+//            try {
+//                Log.i(TAG, "Streaming data from network: " + location);
+//                stream = downloadUrl(location);
+//                updateLocalFeedData(stream, syncResult);
+//                // Makes sure that the InputStream is closed after the app is
+//                // finished using it.
+//            } finally {
+//                if (stream != null) {
+//                    stream.close();
+//                }
+//            }
+//        } catch (MalformedURLException e) {
+//            Log.e(TAG, "Feed URL is malformed", e);
+//            syncResult.stats.numParseExceptions++;
+//            return;
+//        } catch (IOException e) {
+//            Log.e(TAG, "Error reading from network: " + e.toString());
+//            syncResult.stats.numIoExceptions++;
+//            return;
+//        } catch (XmlPullParserException e) {
+//            Log.e(TAG, "Error parsing feed: " + e.toString());
+//            syncResult.stats.numParseExceptions++;
+//            return;
+//        } catch (ParseException e) {
+//            Log.e(TAG, "Error parsing feed: " + e.toString());
+//            syncResult.stats.numParseExceptions++;
+//            return;
+//        } catch (RemoteException e) {
+//            Log.e(TAG, "Error updating database: " + e.toString());
+//            syncResult.databaseError = true;
+//            return;
+//        } catch (OperationApplicationException e) {
+//            Log.e(TAG, "Error updating database: " + e.toString());
+//            syncResult.databaseError = true;
+//            return;
+//        }
+//        Log.i(TAG, "Network synchronization complete");
     }
+
+    private void syncCalendar(ContentProviderClient provider) {
+
+
+//        long calID = 3;
+        long calID = createCalendarWithName(getContext(), "KALENDARRR", null);
+
+        Log.i(TAG, "Calendar ID: " + calID);
+
+
+        long startMillis = 0;
+        long endMillis = 0;
+        Calendar beginTime = Calendar.getInstance();
+//        beginTime.set(2012, 9, 14, 7, 30);
+        startMillis = beginTime.getTimeInMillis();
+        Calendar endTime = Calendar.getInstance();
+        endTime.set(2016, 9, 14, 8, 45);
+        endMillis = endTime.getTimeInMillis();
+
+
+//        ContentResolver cr = getContentResolver();
+
+
+
+        ContentValues values = new ContentValues();
+        values.put(CalendarContract.Events.DTSTART, startMillis);
+        values.put(CalendarContract.Events.DTEND, endMillis);
+        values.put(CalendarContract.Events.TITLE, "Eeee2222");
+        values.put(CalendarContract.Events.DESCRIPTION, "Group workout");
+        values.put(CalendarContract.Events.CALENDAR_ID, calID);
+        values.put(CalendarContract.Events.EVENT_TIMEZONE, "America/Los_Angeles");
+
+        values.put(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_PRIVATE);
+
+        values.put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.teamzeusapp");
+        values.put(CalendarContract.Events.CUSTOM_APP_URI, Uri.decode("udini://udini")); // Not sure how to work with it
+
+//        Uri uri = cr.insert(CalendarContract.Events.CONTENT_URI, values);
+        Uri uri = null;
+        try {
+            uri = provider.insert(CalendarContract.Events.CONTENT_URI, values);
+        } catch (RemoteException e) {
+            e.printStackTrace();
+        }
+
+// get the event ID that is the last element in the Uri
+        long eventID = Long.parseLong(uri.getLastPathSegment());
+//
+// ... do something with event ID
+//
+//
+
+
+    }
+
+
+    public static long createCalendarWithName(Context ctx, String name, String accountName) {
+
+        accountName = GenericAccountService.ACCOUNT_NAME; // XXX
+        String accountType = SyncUtils.ACCOUNT_TYPE;
+
+        Uri target = Uri.parse(CalendarContract.Calendars.CONTENT_URI.toString());
+        target = target.buildUpon().appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, accountName)
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_TYPE, accountType).build();
+
+
+        ContentValues values = new ContentValues();
+        values.put(Calendars.ACCOUNT_NAME, accountName);
+        values.put(Calendars.ACCOUNT_TYPE, accountType);
+        values.put(Calendars.NAME, name);
+        values.put(Calendars.CALENDAR_DISPLAY_NAME, name);
+        values.put(Calendars.CALENDAR_COLOR, 0xF0FF00);
+//        values.put(Calendars.CALENDAR_ACCESS_LEVEL, CalendarContract.Calendars.CAL_ACCESS_ROOT);
+        values.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_READ);
+        values.put(Calendars.OWNER_ACCOUNT, accountName);
+        values.put(Calendars.VISIBLE, 1);
+        values.put(Calendars.SYNC_EVENTS, 1);
+//        values.put(Calendars.CALENDAR_TIME_ZONE, "Europe/Rome");
+        values.put(Calendars.CAN_PARTIALLY_UPDATE, 1);
+//        values.put(Calendars.CAL_SYNC1, "https://www.google.com/calendar/feeds/" + accountName + "/private/full");
+//        values.put(Calendars.CAL_SYNC2, "https://www.google.com/calendar/feeds/default/allcalendars/full/" + accountName);
+//        values.put(Calendars.CAL_SYNC3, "https://www.google.com/calendar/feeds/default/allcalendars/full/" + accountName);
+//        values.put(Calendars.CAL_SYNC4, 1);
+//        values.put(Calendars.CAL_SYNC5, 0);
+//        values.put(Calendars.CAL_SYNC8, System.currentTimeMillis());
+
+        Uri newCalendar = ctx.getContentResolver().insert(target, values);
+
+        long calendarID = Long.parseLong(newCalendar.getLastPathSegment());
+
+        return calendarID;
+    }
+
+
+
+
+
 
     /**
      * Read XML from an input stream, storing it into the content provider.
