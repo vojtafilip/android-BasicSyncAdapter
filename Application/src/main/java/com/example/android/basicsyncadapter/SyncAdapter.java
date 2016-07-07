@@ -35,9 +35,12 @@ import android.provider.CalendarContract;
 import android.provider.CalendarContract.*;
 import android.util.Log;
 
+import com.example.android.Api;
 import com.example.android.basicsyncadapter.net.FeedParser;
 import com.example.android.basicsyncadapter.provider.FeedContract;
 import com.example.android.common.accounts.GenericAccountService;
+import com.example.android.data.model.CalendarsEventsList;
+import com.example.android.data.model.Event;
 
 import org.xmlpull.v1.XmlPullParserException;
 
@@ -52,6 +55,8 @@ import java.util.Calendar;
 import java.util.HashMap;
 import java.util.List;
 
+import retrofit2.Response;
+
 /**
  * Define a sync adapter for the app.
  *
@@ -63,6 +68,7 @@ import java.util.List;
  */
 class SyncAdapter extends AbstractThreadedSyncAdapter {
     public static final String TAG = "SyncAdapter";
+
 
     /**
      * URL to fetch content from during a sync.
@@ -193,45 +199,98 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
     private void syncCalendar(ContentProviderClient provider) {
 
 
-//        long calID = 3;
-        long calID = createCalendarWithName(getContext(), "KALENDARRR", null);
+        Response<CalendarsEventsList> response = null;
+        try {
+//            response = Api.getService().calendarsEventsList("819feadcdae142448ca7124cb85c84a5", "2015-10-21", "2016-10-21").execute();
+            response = Api.getService().calendarsEventsList("e2f9A3MPav63VjzDgE9WKgyFxQsxVLFma99086f1d272475d8a0275f3982b49de", "2015-10-21", "2016-10-21").execute();
 
-        Log.i(TAG, "Calendar ID: " + calID);
+            Log.d(TAG, "Response code: " + response.code());
+
+            if(response.isSuccessful()) {
+
+                CalendarsEventsList body = response.body();
+                Log.d(TAG, "Response: " + body);
+
+                //        long calID = 3;
+                long calID = createCalendarWithName(provider, "Team Zeus");
+
+                Log.i(TAG, "Calendar ID: " + calID);
 
 
-        long startMillis = 0;
-        long endMillis = 0;
-        Calendar beginTime = Calendar.getInstance();
-//        beginTime.set(2012, 9, 14, 7, 30);
-        startMillis = beginTime.getTimeInMillis();
-        Calendar endTime = Calendar.getInstance();
-        endTime.set(2016, 9, 14, 8, 45);
-        endMillis = endTime.getTimeInMillis();
+                for (Event event : body.getEvents()) {
+                    createEvent(provider, calID, event);
+                }
 
 
-//        ContentResolver cr = getContentResolver();
+            } else {
+                Log.d(TAG, "Response message: " + response.message());
+            }
 
+        } catch (IOException e) {
+            Log.e(TAG, "api call error", e);
+        }
+
+
+        Log.d(TAG, "DONE");
+    }
+
+
+    private void createEvent(ContentProviderClient provider, long calID, Event event) {
+
+
+
+//        long startMillis = 0;
+//        long endMillis = 0;
+//        Calendar beginTime = Calendar.getInstance();
+////        beginTime.set(2012, 9, 14, 7, 30);
+//        startMillis = beginTime.getTimeInMillis();
+//        Calendar endTime = Calendar.getInstance();
+//        endTime.set(2016, 9, 14, 8, 45);
+//        endMillis = endTime.getTimeInMillis();
+
+        long startMillis = event.getStart().getTime();
+        long endMillis = event.getEnd().getTime();
 
 
         ContentValues values = new ContentValues();
         values.put(CalendarContract.Events.DTSTART, startMillis);
         values.put(CalendarContract.Events.DTEND, endMillis);
-        values.put(CalendarContract.Events.TITLE, "Eeee2222");
-        values.put(CalendarContract.Events.DESCRIPTION, "Group workout");
+        values.put(CalendarContract.Events.TITLE, event.getName());
+        values.put(CalendarContract.Events.DESCRIPTION, event.getName());
         values.put(CalendarContract.Events.CALENDAR_ID, calID);
-        values.put(CalendarContract.Events.EVENT_TIMEZONE, "America/Los_Angeles");
+//        values.put(CalendarContract.Events.EVENT_TIMEZONE, "America/Los_Angeles");
+        values.put(CalendarContract.Events.EVENT_TIMEZONE, "Europe/Rome");
+//        values.put(Events.EVENT_COLOR, Integer.valueOf("0x" + event.getColor().substring(1)));
+//        values.put(Events.EVENT_COLOR, Integer.parseInt(event.getColor().substring(1), 16));
+
+        values.put(Events.ALL_DAY, event.isAllDay() ? 1 : 0);
 
         values.put(CalendarContract.Events.ACCESS_LEVEL, CalendarContract.Events.ACCESS_PRIVATE);
 
         values.put(CalendarContract.Events.CUSTOM_APP_PACKAGE, "com.teamzeusapp");
         values.put(CalendarContract.Events.CUSTOM_APP_URI, Uri.decode("udini://udini")); // Not sure how to work with it
+        // XXX
+
+
+//        values.put(Events.ACCOUNT_NAME, accountName);
+//        values.put(Events.ACCOUNT_TYPE, accountType);
+
+        values.put(Events._SYNC_ID, event.getId());
+        values.put(Events.DIRTY, 0);
+
 
 //        Uri uri = cr.insert(CalendarContract.Events.CONTENT_URI, values);
         Uri uri = null;
         try {
-            uri = provider.insert(CalendarContract.Events.CONTENT_URI, values);
+
+            Uri target = Uri.parse(CalendarContract.Events.CONTENT_URI.toString());
+            target = target.buildUpon().appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                    .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, accountName)
+                    .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_TYPE, accountType).build();
+
+            uri = provider.insert(target, values);
         } catch (RemoteException e) {
-            e.printStackTrace();
+            Log.e(TAG, "errr", e);
         }
 
 // get the event ID that is the last element in the Uri
@@ -244,11 +303,11 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
 
     }
 
+    static String accountName = GenericAccountService.ACCOUNT_NAME; // XXX
+    static String accountType = SyncUtils.ACCOUNT_TYPE;
 
-    public static long createCalendarWithName(Context ctx, String name, String accountName) {
+    public static long createCalendarWithName(ContentProviderClient provider, String name) {
 
-        accountName = GenericAccountService.ACCOUNT_NAME; // XXX
-        String accountType = SyncUtils.ACCOUNT_TYPE;
 
         Uri target = Uri.parse(CalendarContract.Calendars.CONTENT_URI.toString());
         target = target.buildUpon().appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
@@ -263,7 +322,7 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         values.put(Calendars.CALENDAR_DISPLAY_NAME, name);
         values.put(Calendars.CALENDAR_COLOR, 0xF0FF00);
 //        values.put(Calendars.CALENDAR_ACCESS_LEVEL, CalendarContract.Calendars.CAL_ACCESS_ROOT);
-        values.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_READ);
+        values.put(Calendars.CALENDAR_ACCESS_LEVEL, Calendars.CAL_ACCESS_CONTRIBUTOR);
         values.put(Calendars.OWNER_ACCOUNT, accountName);
         values.put(Calendars.VISIBLE, 1);
         values.put(Calendars.SYNC_EVENTS, 1);
@@ -276,7 +335,12 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
 //        values.put(Calendars.CAL_SYNC5, 0);
 //        values.put(Calendars.CAL_SYNC8, System.currentTimeMillis());
 
-        Uri newCalendar = ctx.getContentResolver().insert(target, values);
+        Uri newCalendar = null;
+        try {
+            newCalendar = provider.insert(target, values);
+        } catch (RemoteException e) {
+            Log.e(TAG, "errr", e);
+        }
 
         long calendarID = Long.parseLong(newCalendar.getLastPathSegment());
 
