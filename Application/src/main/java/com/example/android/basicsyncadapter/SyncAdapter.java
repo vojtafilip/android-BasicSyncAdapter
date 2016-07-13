@@ -148,6 +148,9 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
         Log.i(TAG, "Beginning network synchronization");
 
 
+        listEvents(provider);
+
+
         syncCalendar(provider);
 
 
@@ -194,6 +197,64 @@ class SyncAdapter extends AbstractThreadedSyncAdapter {
 //            return;
 //        }
 //        Log.i(TAG, "Network synchronization complete");
+    }
+
+    private void listEvents(ContentProviderClient provider) {
+
+        Uri target = Uri.parse(CalendarContract.Events.CONTENT_URI.toString());
+        target = target.buildUpon().appendQueryParameter(CalendarContract.CALLER_IS_SYNCADAPTER, "true")
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_NAME, accountName)
+                .appendQueryParameter(CalendarContract.Calendars.ACCOUNT_TYPE, accountType).build();
+
+        Cursor cursor = null;
+        try {
+            cursor = provider.query(target, null, null, null, null);
+        } catch (RemoteException e) {
+            Log.e(TAG, "err", e);
+        }
+        int cc = cursor.getColumnCount();
+
+        if(cursor.getCount() > 0) {
+
+            cursor.moveToFirst();
+            while (!cursor.isLast()) {
+
+                StringBuilder sb = new StringBuilder();
+
+                for (int i = 0; i < cc; i++) {
+                    String name = cursor.getColumnName(i);
+                    String value;
+                    switch (cursor.getType(i)) {
+                        case Cursor.FIELD_TYPE_NULL:
+                            value = null;
+                            break;
+                        case Cursor.FIELD_TYPE_STRING:
+                            value = cursor.getString(i);
+                            break;
+                        case Cursor.FIELD_TYPE_INTEGER:
+                            value = String.valueOf(cursor.getLong(i));
+                            break;
+                        case Cursor.FIELD_TYPE_FLOAT:
+                            value = String.valueOf(cursor.getDouble(i));
+                            break;
+                        default:
+                            value = "XXX";
+                    }
+
+                    sb.append(name).append("=").append(value).append(", ");
+                }
+
+                Log.d(TAG, "Columns: " + sb.toString());
+//                if(sb.toString().contains("AXA")) { // XXX
+//                    Log.d(TAG, "Columns: " + sb.toString());
+//                }
+
+                cursor.moveToNext();
+            }
+        } else {
+            Log.d(TAG, "EMPTY EVENTS...");
+        }
+
     }
 
     private void syncCalendar(ContentProviderClient provider) {
